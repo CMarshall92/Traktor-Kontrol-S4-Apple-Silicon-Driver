@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-2.0-only -->
+<installer-gui-script minSpecVersion="2">
+    <title>Traktor Kontrol S4 Driver 2.8.0 (Apple Silicon)</title>
+    <organization>cc.moretti.s4native</organization>
+
+    <options customize="allow"
+             allow-external-scripts="no"
+             hostArchitectures="arm64"
+             rootVolumeOnly="true"
+             require-scripts="false"/>
+
+    <readme file="ReadMe.html"/>
+
+    <installation-check script="pm_install_check();"/>
+    <script><![CDATA[
+    function pm_install_check() {
+        var arm = system.sysctl('hw.optional.arm64');
+        if (arm == '0') {
+            my.result.title = 'Not an Apple Silicon Mac';
+            my.result.message = 'This installer replaces the Intel-only Native Instruments driver with the arm64 driver. Use “Traktor Kontrol S4 2.8.0 Installer Mac.pkg” on an Intel Mac instead.';
+            my.result.type = 'Fatal';
+            return false;
+        }
+        if (!(system.compareVersions(system.version.ProductVersion, '11.0') >= 0)) {
+            my.result.title = 'macOS 11 or later required';
+            my.result.message = 'This driver requires macOS 11 Big Sur or later on Apple Silicon.';
+            my.result.type = 'Fatal';
+            return false;
+        }
+        return true;
+    }
+    ]]></script>
+
+    <choices-outline>
+        <line choice="audio"/>
+        <line choice="kext"/>
+    </choices-outline>
+
+    <choice id="audio"
+            title="S4 MK1 Audio Driver (arm64)"
+            description="arm64 CoreAudio HAL driver. Creates the “Traktor Kontrol S4 MK1” audio device and owns the S4’s USB audio interface. Required. Needs only your administrator password."
+            start_selected="true" start_visible="true">
+        <pkg-ref id="com.caiaq.s4.applesilicon.hal"/>
+    </choice>
+
+    <choice id="kext"
+            title="Traktor Controller Integration (kernel extension)"
+            description="arm64 identity shim kernel extension. Without it, Traktor Pro 4 does not recognise the S4 as a controller (audio still works in other apps). Installing it requires Reduced Security and disabled kext signing, set once in recovery mode — see the Read Me."
+            start_selected="true" start_visible="true">
+        <pkg-ref id="cc.moretti.s4native.CaiaqS4Shim"/>
+    </choice>
+
+    <pkg-ref id="com.caiaq.s4.applesilicon.hal" version="2.8.0-arm64.1" onConclusion="none">hal.pkg</pkg-ref>
+    <pkg-ref id="cc.moretti.s4native.CaiaqS4Shim" version="1.0.0" onConclusion="none">kext.pkg</pkg-ref>
+</installer-gui-script>

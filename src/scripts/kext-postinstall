@@ -1,0 +1,47 @@
+#!/bin/bash
+# Traktor Kontrol S4 MK1 - Apple Silicon installer, shim kext component.
+# SPDX-License-Identifier: GPL-2.0-only
+set -u
+
+LOG=/var/log/traktor-s4-applesilicon-install.log
+exec >>"$LOG" 2>&1
+echo "=== kext postinstall: $(date) ==="
+
+KEXT="/Library/Extensions/CaiaqS4Shim.kext"
+ID="cc.moretti.s4native.CaiaqS4Shim"
+
+if [ ! -d "$KEXT" ]; then
+    echo "error: $KEXT missing from payload"
+    exit 1
+fi
+
+chown -R root:wheel "$KEXT"
+chmod -R 755 "$KEXT"
+xattr -cr "$KEXT" 2>/dev/null || true
+codesign --force --sign - --timestamp=none "$KEXT" 2>>"$LOG" || true
+
+echo "diagnostics:"; /usr/bin/kmutil print-diagnostics -p "$KEXT" 2>&1 | head -40 || true
+
+SIP="$(/usr/bin/csrutil status 2>&1 || true)"
+echo "csrutil status:
+$SIP"
+
+if printf '%s' "$SIP" | /usr/bin/grep -q "Kext Signing: disabled" || printf '%s' "$SIP" | /usr/bin/grep -q "status: disabled"; then
+    echo "kext signing is disabled: attempting load"
+    /usr/bin/kmutil clear-staging 2>/dev/null || true
+    if /usr/bin/kmutil load -p "$KEXT" 2>&1; then
+        echo "kext load request accepted"
+    else
+        echo "kext load did not complete; approve it in System Settings > Privacy & Security, then restart"
+    fi
+else
+    cat <<'MSG'
+Kext signing is enabled, so macOS will refuse this kernel extension for now.
+Complete the one-time recovery-mode step described in the Read Me:
+  Startup Security Utility -> Reduced Security + Allow user management of kernel extensions
+  Terminal: bputil -n -k ; csrutil enable --without kext ; reboot
+Then approve "CaiaqS4Shim" in System Settings > Privacy & Security and restart.
+MSG
+fi
+
+exit 0

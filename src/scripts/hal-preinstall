@@ -1,0 +1,31 @@
+#!/bin/bash
+# Traktor Kontrol S4 MK1 - Apple Silicon installer, audio HAL component.
+# Removes legacy x86_64 NI components that cannot load on Apple Silicon and any
+# earlier copy of this driver, so the new bundle is never copied over stale code.
+# SPDX-License-Identifier: GPL-2.0-only
+set -u
+
+LOG=/var/log/traktor-s4-applesilicon-install.log
+exec >>"$LOG" 2>&1
+echo "=== hal preinstall: $(date) ==="
+
+# A developer build (s4hostd/s4stream) may own the USB interface exclusively.
+pkill -x s4stream 2>/dev/null || true
+pkill -x s4hostd 2>/dev/null || true
+
+# The original 2.8.0 payload is x86_64-only. On Apple Silicon it can never load,
+# so remove it rather than leave a broken duplicate in the way.
+LEGACY_KEXT="/Library/Extensions/NIUSBTraktorKontrolS4.kext"
+if [ -d "$LEGACY_KEXT" ]; then
+    /usr/bin/kmutil unload -p "$LEGACY_KEXT" 2>/dev/null || true
+    rm -rf "$LEGACY_KEXT"
+fi
+rm -rf "/Library/Audio/MIDI Drivers/NIUSBTraktorKontrolS4MIDIDriver.plugin"
+rm -rf "/Library/PreferencePanes/NIUSBAudio.prefPane"
+rm -rf "/Library/Audio/MIDI Devices/Native Instruments/Images/Traktor Kontrol S4.tiff"
+
+# Never copy a new HAL bundle over an old one (stale code pages kill the driver host).
+rm -rf "/Library/Audio/Plug-Ins/HAL/S4MK1.driver"
+/usr/bin/kmutil clear-staging 2>/dev/null || true
+
+exit 0

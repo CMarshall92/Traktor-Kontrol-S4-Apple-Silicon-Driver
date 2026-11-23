@@ -1,0 +1,8 @@
+.DS_Store
+
+# Build output: the upstream clone, compiled bundles, packages and images.
+/build/
+/dist/
+
+*.pkg
+*.dmg

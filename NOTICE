@@ -1,0 +1,41 @@
+s4mk1-revival-macos
+Copyright (C) 2026 the s4mk1-revival-macos contributors
+
+Licensed under the GNU General Public License, version 2 only (GPL-2.0-only).
+See LICENSE.
+
+The USB protocol knowledge in this project comes in part from the Linux snd-usb-caiaq
+driver (GPL-2.0) and from dekkr-s4mk1 (GPL-2.0). The interface that Traktor uses to talk
+to the driver was worked out by reverse engineering, for interoperability only.
+
+No Native Instruments code or binaries are included in this repository or in anything it
+builds. Traktor, Traktor Kontrol and Native Instruments are trademarks of Native
+Instruments GmbH. This project is not affiliated with or endorsed by Native Instruments.
+
+--------------------------------------------------------------------------------
+
+Traktor Kontrol S4 Apple Silicon installer
+Copyright (C) 2026 the Traktor Kontrol S4 Apple Silicon installer contributors
+
+This repository is the arm64 packaging for macOS: the installer scripts,
+Distribution.xml, documentation and build script. It is licensed under the GNU
+General Public License, version 2 only (GPL-2.0-only), the same licence as the driver
+it packages. The full licence text is in LICENSE.
+
+The installer builds the audio driver and the kernel extension from
+
+    https://github.com/almoretti/s4mk1-revival-macos
+    commit 2b0e9875384a9e3658e1c066d175ddc80bbb84c0
+
+and does not modify that source. The corresponding source for those binaries is
+published with each release as s4mk1-revival-macos-<commit>.tar.gz, and is also
+available from the repository above at the pinned commit.
+
+The built bundles are ad-hoc signed by the installer's post-install scripts
+(codesign --sign -) so that macOS accepts them without an Apple Developer ID. That
+changes the code signature only; the compiled code is the unmodified upstream build.
+
+The kernel extension publishes the IOKit class names
+com_caiaq_driver_TraktorKontrolS4_NIUSBAudioDevice and
+com_caiaq_driver_TraktorKontrolS4_NIUSBUserClient. These names are required for
+Traktor Pro to bind to the device and are used for interoperability only.

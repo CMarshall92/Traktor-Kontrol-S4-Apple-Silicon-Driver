@@ -1,0 +1,38 @@
+#!/bin/bash
+# Traktor Kontrol S4 MK1 - Apple Silicon installer, audio HAL component.
+# SPDX-License-Identifier: GPL-2.0-only
+set -u
+
+LOG=/var/log/traktor-s4-applesilicon-install.log
+exec >>"$LOG" 2>&1
+echo "=== hal postinstall: $(date) ==="
+
+PLUGIN="/Library/Audio/Plug-Ins/HAL/S4MK1.driver"
+
+if [ ! -d "$PLUGIN" ]; then
+    echo "error: $PLUGIN missing from payload"
+    exit 1
+fi
+
+chown -R root:wheel "$PLUGIN"
+chmod -R 755 "$PLUGIN"
+# Quarantine and provenance attributes make the sandboxed audio driver host refuse
+# an ad-hoc bundle.
+xattr -cr "$PLUGIN" 2>/dev/null || true
+# Re-sign in place, after the final copy (ad-hoc; an Apple certificate is not required
+# for a HAL plug-in, only for Gatekeeper distribution).
+codesign --force --sign - --timestamp=none "$PLUGIN" 2>>"$LOG" || true
+
+echo "codesign verify:"; codesign -vv "$PLUGIN" 2>&1 || true
+
+# On macOS 26+ each HAL plug-in has its own driver-host process. Kill just it, so
+# other audio clients do not have to re-enumerate; fall back to coreaudiod on first
+# install, when no host for this plug-in exists yet.
+if pkill -9 -f 'Core Audio Driver (S4MK1.driver)' 2>/dev/null; then
+    echo "killed existing S4MK1 driver host"
+else
+    /usr/bin/killall coreaudiod 2>/dev/null || true
+    echo "restarted coreaudiod"
+fi
+
+exit 0

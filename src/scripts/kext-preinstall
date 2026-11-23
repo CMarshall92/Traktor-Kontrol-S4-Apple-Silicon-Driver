@@ -1,0 +1,21 @@
+#!/bin/bash
+# Traktor Kontrol S4 MK1 - Apple Silicon installer, shim kext component.
+# SPDX-License-Identifier: GPL-2.0-only
+set -u
+
+LOG=/var/log/traktor-s4-applesilicon-install.log
+exec >>"$LOG" 2>&1
+echo "=== kext preinstall: $(date) ==="
+
+KEXT="/Library/Extensions/CaiaqS4Shim.kext"
+if [ -d "$KEXT" ]; then
+    /usr/bin/kmutil unload -b cc.moretti.s4native.CaiaqS4Shim 2>/dev/null || true
+    /usr/bin/kmutil unload -p "$KEXT" 2>/dev/null || true
+    rm -rf "$KEXT"
+fi
+/usr/bin/kmutil clear-staging 2>/dev/null || true
+
+# The stub kext and the __CAIAQ_* ABI constants must come from the same build.
+rm -rf "/Library/Audio/Plug-Ins/HAL/S4MK1.driver.bak" 2>/dev/null || true
+
+exit 0

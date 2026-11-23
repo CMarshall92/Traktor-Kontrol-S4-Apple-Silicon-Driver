@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-2.0-only -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font: 13px -apple-system, "Helvetica Neue", sans-serif; color: #222; margin: 18px 22px; }
+  h1 { font-size: 17px; margin: 0 0 10px; }
+  h2 { font-size: 13px; margin: 18px 0 6px; text-transform: uppercase; letter-spacing: .04em; color: #555; }
+  h3 { font-size: 12px; margin: 12px 0 4px; }
+  p, li { line-height: 1.45; }
+  code { font-family: Menlo, monospace; font-size: 12px; background: #f2f2f2; padding: 1px 4px; border-radius: 3px; }
+  pre { font-family: Menlo, monospace; font-size: 12px; background: #f5f5f5; border: 1px solid #e2e2e2;
+        border-radius: 5px; padding: 9px 11px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0 10px; font-size: 12px; }
+  th, td { text-align: left; vertical-align: top; padding: 5px 7px; border: 1px solid #e2e2e2; }
+  th { background: #f5f5f5; font-weight: 600; }
+  .note { background: #fff8e1; border: 1px solid #f0d98a; border-radius: 5px; padding: 9px 11px; }
+  .small { color: #666; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>Traktor Kontrol S4 MK1 Driver 2.8.0 — Apple Silicon</h1>
+
+<p>Native Instruments never shipped an arm64 driver for the S4 MK1. This installer
+replaces the Intel-only 2.8.0 driver with an arm64 build of the open-source
+<a href="https://github.com/almoretti/s4mk1-revival-macos">S4 MK1 Revival</a> driver:</p>
+
+<ul>
+  <li><b>S4 MK1 Audio Driver</b> — a CoreAudio HAL plug-in that talks to the S4’s USB
+      audio interface directly. Creates a <b>Traktor Kontrol S4</b> audio device.</li>
+  <li><b>Traktor Controller Integration</b> — a small identity shim kernel extension.
+      Traktor Pro 4 looks for one exact IOKit class name; only the kernel can provide it.
+      Without this, audio works in other apps but Traktor will not see the controller.</li>
+</ul>
+
+<p class="note">Reading this in Installer: do <b>Phase 1</b> now if you want controller
+support, then continue with the install. If you only want the audio device, skip
+Phase 1 and uncheck <b>Traktor Controller Integration</b> in the Customize pane.</p>
+
+<h2>Requirements</h2>
+<ul>
+  <li>An Apple Silicon Mac (M1 or later), macOS 11 or later.</li>
+  <li>Administrator password.</li>
+  <li>The S4 MK1 and a USB cable. About 15 minutes for the first install.</li>
+</ul>
+
+<h2>Phase 1 — One-time security change (recoveryOS)</h2>
+<p>This is only for the kernel extension. If you only want the audio device, skip
+this phase and uncheck that component in Phase 2.</p>
+<ol>
+  <li>Shut down completely.</li>
+  <li>Press and <b>hold</b> the power button until <b>Loading startup options</b>
+      appears, then click <b>Options → Continue</b> and log in. Holding the power
+      button is what enters One True Recovery (1TR), which <code>bputil</code>
+      requires.</li>
+  <li>Menu bar: <b>Utilities → Startup Security Utility</b>. Select your startup
+      disk, choose <b>Reduced Security</b>, tick <b>Allow user management of kernel
+      extensions from identified developers</b>, and click <b>OK</b>.</li>
+  <li>Menu bar: <b>Utilities → Terminal</b>, then run these one line at a time:</li>
+</ol>
+<pre>bputil -n -k
+csrutil enable --without kext
+reboot</pre>
+<p class="small"><code>bputil</code> asks for your admin user name and password. When
+it finishes, the Mac restarts.</p>
+
+<h3>What these do</h3>
+<ul>
+  <li><code>bputil -n -k</code> recreates the boot policy with third-party kext loading
+      enabled (Permissive Security). Pass both flags in <b>one</b> invocation:
+      <code>-n</code> rebuilds the policy and keeps only the options named in that same
+      command.</li>
+  <li><code>csrutil enable --without kext</code> keeps System Integrity Protection on
+      but disables kext signature checking, which the ad-hoc-signed shim needs.</li>
+</ul>
+<p>To stay on <b>Reduced Security</b> instead of Permissive, use <code>bputil -k</code>
+instead of <code>bputil -n -k</code> (the GUI step above already sets this). If the kext
+is later refused with a signature error, redo this phase with the exact pair above, or
+fall back to <code>csrutil disable</code>.</p>
+<p>Optional confirmation before leaving recovery:</p>
+<pre>bputil -d
+csrutil status</pre>
+
+<h2>Phase 2 — Install</h2>
+<ol>
+  <li>Click <b>Continue → Install</b> and authenticate.</li>
+  <li>In <b>Customize</b>, leave both checked:
+      <ul>
+        <li><b>S4 MK1 Audio Driver</b> — the CoreAudio device.</li>
+        <li><b>Traktor Controller Integration</b> — the kext Traktor needs.</li>
+      </ul></li>
+  <li>Let it finish. The installer removes the old x86_64 NI kext, MIDI plug-in and
+      preference pane, installs and ad-hoc-signs the arm64 driver and kext, and tries
+      to load the kext.</li>
+</ol>
+<p>The post-install step will usually report that the extension is <b>waiting for
+approval</b>. That is expected; continue to Phase 3.</p>
+
+<h2>Phase 3 — Approve the extension and restart</h2>
+<ol>
+  <li>Open <b>System Settings → Privacy &amp; Security</b> and scroll to <b>Security</b>.
+      Click <b>Allow</b> next to the blocked <b>CaiaqS4Shim</b> message
+      (authenticate).</li>
+  <li>If no button appears, re-trigger the prompt from Terminal:</li>
+</ol>
+<pre>sudo kmutil load -p /Library/Extensions/CaiaqS4Shim.kext</pre>
+<ol start="3">
+  <li><b>Restart.</b> Booting with the S4 unplugged is fine and recommended for the
+      first boot after installing.</li>
+  <li>After login, plug in the S4.</li>
+</ol>
+
+<h2>Phase 4 — Verify</h2>
+<pre># 1. Kext loaded?
+kmutil showloaded --bundle-identifier cc.moretti.s4native.CaiaqS4Shim
+
+# 2. Did it match the S4?
+ioreg -r -c com_caiaq_driver_TraktorKontrolS4_NIUSBUserClient -d 1 | grep -E 'Caiaq'
+
+# 3. Audio device present?
+system_profiler SPAudioDataType | grep -A6 -i 'S4'
+
+# 4. Driver log (Ctrl-C to stop)
+log stream --predicate 'subsystem == "cc.moretti.s4"'</pre>
+<p><b>Expected</b></p>
+<ul>
+  <li><code>kmutil showloaded</code> lists <code>cc.moretti.s4native.CaiaqS4Shim</code>.</li>
+  <li><code>ioreg</code> shows <code>CaiaqArmedMask</code> (goes non-zero once Traktor
+      connects) and a rising <code>CaiaqDelivered</code>.</li>
+  <li><code>system_profiler</code> shows <b>Traktor Kontrol S4</b>.</li>
+  <li>The log shows <code>device open, fw …</code>, then <code>kext connected</code>,
+      then a <code>reports digital … analog …</code> line every ~5 seconds.</li>
+  <li>If the kext is not loaded, the log says <code>kext not available … streaming
+      without it</code> and the reports line ends with <code>(no kext)</code>; audio
+      still works.</li>
+</ul>
+<p>Then open <b>Traktor Pro 4 → Preferences → Controller Manager</b>. It should list
+<b>Traktor Kontrol S4</b>, not “Generic MIDI”. Set <b>Traktor Kontrol S4</b> as the
+audio device in Traktor’s <b>Audio Setup</b> if it is not selected automatically.</p>
+
+<h2>Troubleshooting</h2>
+<table>
+  <tr><th>Symptom</th><th>Cause / fix</th></tr>
+  <tr><td>Installer says <b>Not an Apple Silicon Mac</b></td>
+      <td>You are on an Intel Mac. This installer is arm64-only; use the Native
+      Instruments 2.8.0 installer there.</td></tr>
+  <tr><td><b>Bad code signature</b> / extension refused</td>
+      <td>Redo Phase 1 with <code>csrutil disable</code> instead of
+      <code>csrutil enable --without kext</code>, then restart.</td></tr>
+  <tr><td>Kext installed but not loaded</td>
+      <td>Approve it in <b>Privacy &amp; Security</b>, run
+      <code>sudo kmutil load -p /Library/Extensions/CaiaqS4Shim.kext</code>, then
+      restart.</td></tr>
+  <tr><td>No audio device in Audio MIDI Setup</td>
+      <td>Run <code>sudo killall coreaudiod</code>, replug the S4, and check
+      <code>log stream</code> for <code>cc.moretti.s4</code>.</td></tr>
+  <tr><td>Audio works, Traktor does not see the controller</td>
+      <td>The kext is not loaded or approved. Audio and controller support are
+      independent.</td></tr>
+  <tr><td>Mac loops at boot with the S4 attached</td>
+      <td>Observed only with an early panicking kext build. Unplug the S4, boot, log
+      in, then plug it in. If it recurs, uninstall the kext.</td></tr>
+  <tr><td>No sound from MAIN or PHONES</td>
+      <td>Select <b>Traktor Kontrol S4</b> as the output device. Output is 44.1 kHz
+      only; inputs and multi-channel routing are not implemented yet.</td></tr>
+  <tr><td><code>ioreg</code> shows the kext but <code>CaiaqArmedMask</code> stays 0</td>
+      <td>Traktor is not connected to the controller yet. Open Traktor and check
+      <b>Controller Manager</b>.</td></tr>
+</table>
+
+<h2>Uninstall / restore security</h2>
+<p>Double-click <b>Uninstall Traktor Kontrol S4 Driver.command</b> in this folder, or
+do it manually:</p>
+<pre>sudo kmutil unload -b cc.moretti.s4native.CaiaqS4Shim
+sudo rm -rf /Library/Extensions/CaiaqS4Shim.kext
+sudo rm -rf "/Library/Audio/Plug-Ins/HAL/S4MK1.driver"
+sudo kmutil clear-staging
+sudo killall coreaudiod</pre>
+<p>Then restore security: shut down, hold the power button, <b>Options → Continue</b>,
+<b>Utilities → Startup Security Utility → Full Security</b>, and in recovery Terminal:</p>
+<pre>csrutil enable
+reboot</pre>
+<p class="note"><b>Note:</b> <code>man bputil</code> documents a one-way door. Full
+Security performs an online check, and on a Mac that is not fully up to date it may not
+be possible to set Full Security again. <b>Reduced Security plus
+<code>csrutil enable</code></b> is the realistic restore point in that case. Decide before
+doing Phase 1.</p>
+
+<p class="small">Built from almoretti/s4mk1-revival-macos (GPL-2.0-only) commit 2b0e987. Not affiliated
+with or supported by Native Instruments. The bundled GPL-2.0 licence and notice are in the
+documentation folder.</p>
+
+</body>
+</html>
